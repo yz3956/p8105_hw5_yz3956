@@ -1,7 +1,7 @@
 ---
 title: "Homewwork 5"
 author: "Yali Zhai"
-date: "11/13/2020"
+date: "11/18/2020"
 output: github_document
 ---
 
@@ -141,4 +141,81 @@ study_tidy_df %>%
 ```
 
 For comparison, I make a smooth line of mean for each group. In the control group, the mean value is stable during the 8 weeks. But in the experiment group, the mean value increases gradually with time.
+
+
+## Problem 3
+
+
+```{r}
+sim_mean_p = function(n = 30, mu, sigma = 5) {
+  
+  sim_data = tibble(
+    x = rnorm(n = n, mean = mu, sd = sigma),
+  )
+  
+  sim_data %>% 
+    t.test() %>% 
+    broom::tidy() %>% 
+    select(estimate, p.value)
+}
+```
+
+
+```{r}
+sim_results = 
+  tibble(mu_test = c(0, 1, 2, 3, 4, 5, 6)) %>% 
+  mutate(
+    output_lists = map(.x = mu_test, ~rerun(5000, sim_mean_p(mu = .x))),
+    estimate_dfs = map(output_lists, bind_rows)) %>% 
+  select(-output_lists) %>% 
+  unnest(estimate_dfs) %>% 
+  rename(mean = estimate)
+```
+
+
+make a plot of power
+```{r}
+sim_results %>% 
+  group_by(mu_test) %>% 
+  summarize(
+    sum_rej = sum(p.value < 0.05),
+    power = sum_rej/5000
+  ) %>% 
+  ggplot(aes(x = mu_test, y = power)) +
+   geom_bar(stat = "identity")
+```
+
+As mu getting larger, the power of the test is larger until reaching 1.
+
+
+
+make a plot of average estimate of mean
+```{r}
+sim_results %>% 
+  group_by(mu_test) %>% 
+  summarize(
+    emp_mean = mean(mean)) %>% 
+  ggplot(aes(x = mu_test, y = emp_mean)) +
+   geom_bar(stat = "identity")
+
+```
+
+The average estimate of mu is approximately equal to the true value of mu.
+
+Make the plot of the average estimate of mu in samples for which the null was rejected.
+
+```{r}
+sim_results %>% 
+  filter(p.value < 0.05) %>% 
+  group_by(mu_test) %>% 
+  summarize(
+    rej_mean = mean(mean)) %>% 
+  ggplot(aes(x = mu_test, y = rej_mean)) +
+   geom_bar(stat = "identity")
+```
+
+When mu = 0, the part of estimates of mu which the null is rejected is normally distributed around 0. Thus it average is approximately equal to 0.
+
+When mu > 0, as mu getting larger, the proportion of times the null was rejected is larger, the part that estimates of mu around 0 is smaller, so the average of which the null is rejected is more closer to the true value.
+Thus as we can see from the plot, for mu > 3, the sample average of mu across tests for which the null is rejected is approximately equal to the true value of mu.
 
